@@ -63,8 +63,10 @@
 ### 1.1.16. which
 - 在PATH环境变量中指定的路径中查看命令所在路径；
 - “cd”命令是shell内建命令，不能使用which；
-### 1.1.17. whoami
-- 查看当前用户是谁；
+### 1.1.17. who相关
+- who 显示当前真正登录系统中的用户；
+- whoami；显示的是当前用户下的用户名（有效用户ID）；
+- who am i：显示的是登录时的用户名，相当于who -m；
 ### 1.1.18. chmod
 - chmod [who] [+/-/=] [mode]
     - who可选项
@@ -98,6 +100,7 @@
 ### 1.1.22. grep
 - 查找那个文件包含某个字符串；
 - “grep -r  “str” Path”；
+- grep查找的时候会占用一个进程，如果用ps查进程的时候，结果只有一条，那说明是没有相关进程；
 ### 1.1.23. mount
 - "mount DevName Path";
 - 挂载目录有media（自动挂载）和mnt（手动挂载）；
@@ -136,13 +139,83 @@
     - 不需要添加后缀名，压缩之后会自动添加；
     - zip在压缩目录的时候需要添加参数“-r”；
 ### 1.1.27. ps
-
-
-
-ps
-top
-free命令
-
+- 查看整个系统内部所运行的进程状况；
+- 通过“ps aux | grep xxx”过滤要显示的进程；
+- 参数：
+    - a：当前系统所有用户的进程
+    - u：查看进程所有者及其他信息
+    - x：显示没有控制终端的进程 
+### 1.1.28. kill
+- “kill -l”，查看信号；
+- “kill -信号(值/字符串) 进程号”，杀死进程；
+### 1.1.29. top
+- 相当于window的任务管理器
+### 1.1.30. env
+- 查看当前进程的环境变量；
+- 格式“key = value;value;...”;
+### 1.1.31. ifconfig
+- 查看ip；
+- eth0是第一块网卡；
+- mac地址唯一；
+### 1.1.32. ping
+- 查看网络是否通；
+- linux下的ping不加参数不会主动结束（"-c"）；
+### 1.1.33. nslookup
+- 查看域名对应的IP；
+### 1.1.34. 添加用户
+#### 1.1.34.1. adduser
+- adduser实际上是一个脚本；
+- “sudo adduser UserName”，添加用户；
+- 用户名不能包含大写字母；
+#### 1.1.34.2. useradd
+- useradd是一个命令；
+- 需要后续再设置用户密码；
+- “sudo useradd -s /bin/bash -g GroupName -d 绝对Path -m UserPathName”
+    - s：指定新用户登陆时shell类型；
+    - g：指定所属组，组必须已经存在(groupadd命令)；
+    - d：用户家目录；
+    - m：家目录不存在时自动创建；
+### 1.1.35. 添加用户组
+- “sudo groupadd GroupName”
+### 1.1.36. 删除用户
+#### 1.1.36.1. deluser
+- “sudo deluser UserName”
+#### 1.1.36.2. userdel
+- “sudo userdel -r UserName”，“-r”指把用户主目录也删除；
+### 1.1.37. su
+- “su UserName”，普通用户间切换
+- “sudo su”，切换至root用户
+- “exit”，退出切换到的用户
+### 1.1.38. passwd
+- 给用户设置或修改密码；
+- “sudo passwd UserName”，给普通用户设置密码；
+- “sudo passwd”，给root用户设置密码；
+- “sudo passwd root”，给root用户设置密码；
+- “passwd”，修改当前用户的密码；
+- **/etc/passwd文件内可以查看有哪些用户；**
+### 1.1.39. echo
+- 回显数据；
+- 普通数据：echo 字符串；
+- 显示环境变量：echo $PATH；
+- 显示上一次程序退出值："echo $?","$"取值的意思，“？”最近一次退出程序的返回值；
+### 1.1.40. alias
+- 查看或设置别名
+- alias：查看别名；
+- “alias SrcName = DescName”：设置别名（.bashrc可以永久有效）；
+### 1.1.41. man
+- 查看帮助文档
+- 语法：“man n Name”，n代表man帮助文档的章节；
+- “man 命令”：查看命令的帮助文档；
+- “man man”：查看帮助文档本身；
+    - 1：可执行程序或shell命令
+    - 2：系统调用（内核提供的函数）
+    - 3：库调用（程序库中提供的函数）
+    - 4：特殊文件（通常位于/dev）
+    - 5：文件格式和规范（如：/etc/passwd)
+    - 6：游戏
+    - 7：杂项
+    - 8：系统管理命令
+    - 9：内核例程
 
 ## 1.2. 终端
 ### 1.2.1. 操作
@@ -273,7 +346,121 @@ free命令
 - 5. 把库和可执行程序，安装到系统目录下：sudo make install
 - 6. 删除和卸载软件：sudo make distclean
 - 7. 上述安装步骤并不是绝对的，应该先查看附带的 README 文件
+## 1.7。 vsftpd（ftp服务器）
+### 1.7.1. 安装
+- “sudo apt-get install vsftpd”；
+- 客户端，服务器都会被安装；
+- ftp服务会随开机自动启动；
+### 1.7.2. 配置
+- 配置文件：/etc/vsftpd.conf；
+- 配置选项：
+    - “write_enable=YES”指定是否拥有写权限
+    - “anon_root=/home/burgesskzg/MyFtp”指定匿名用户ftp根目录，原先默认目录（/srv/ftp）失效；
+    - “anonymous_enable=YES”指定是否允许使用匿名用户；
+    - “anon_upload_enable=YES”指定匿名用户是否有上传权限；
+    - “anon_mkdir_write_enable=YES”指定是否允许匿名用户创建目录；
+### 1.7.3. 重启
+- 修改配置文件之后需要重启服务器；
+- “sudo service vsftpd restart”；
+### 1.7.4. 客户端登陆
+#### 1.7.4.1. 实名用户登陆
+- 登陆指令：“ftp 服务器IP->回车->服务器用户名->回车->服务器登陆密码”
+- 缺点：
+    - 用户可以访问任意目录，破坏服务器；
+    - 登陆密码泄露，不安全；
+#### 1.7.4.2. 匿名用户登陆
+- 登陆指令：“ftp 服务器IP->回车->anonymous->回车”
+- 匿名用户登陆不需要密码，直接回车；
+- 匿名账号固定为：anonymous；
+- 匿名用户只能访问指定目录，指定目录配置方法如下：
+    - “sudo mkdir /home/burgesskzg/MyFtp/anonyDir”,在ftp根目录下创建匿名用户的指定目录；
+    - "sudo chown ftp:nogroup /home/burgesskzg/MyFtp/anonyDir”修改指定目录的用户为<font color=red>ftp用户</font>，组为空组（nogroup代表空组）；
+    - “chmod 777 anonyDir”，修改指定目录的权限，否则无法访问；
+### 1.7.4. 上传下载
+- “put FileName”上传文件；
+- “get FileName”下载文件；
+- ftp自带客户端不能传输目录（可以打包后传输）；
+### 1.7.5. 退出
+- quit，bye，exit都可以退出；
+### 1.7.6. lftp客户端
+- 该客户端可以上传下载目录；
+#### 1.7.6.1. 安装
+- sudo apt-get install lftp
+#### 1.7.6.2. 登陆
+- 实名登陆：“lftp UserName@服务器IP->回车->服务器密码”
+- 匿名登陆：“lftp 服务器IP->回车->login”
+#### 1.7.6.3.上传下载
+ - put：上传文件
+ - get：下载文件
+ - mput：上传多个文件
+ - mget：下载多个文件
+ - “mirror –R”：上传整个目录及其子目录
+ - mirror：下载整个目录及其子目录
+### 1.7.7. 疑问
+1. 服务器实名用户怎么指定？
+2. ftp服务器怎么给客户指定用户名和密码？密码怎么设置为临时密码，过一段时间就自动过期？
+3. 在普通用户下安装ftp服务器，那普通用户和ftp用户的关系？
+## 1.8. NFS服务器
+&emsp;&emsp;网络文件系统，网络中的计算机可以共享文件，类似windows中的共享文件夹。
+### 1.8.1. 安装
+- sudo apt-get install nfs-kernel-server
+### 1.8.2. 配置
+- 先创建共享目录；
+- 修改配置文件，添加“共享目录路径 * (rw,sync)”,"*"代表IP地址，这样写是因为有些服务器可能不支持;
+    - ro：只读
+    - rw：读写
+    - sync：文件同步到磁盘，不在内存中长久缓存；
+    - async：与sync相反；
+    - no_root_squash：登入NFS主机，使用共享目录时相当于目录的拥有者。root用户对于这个目录具有root权限，不安全，不建议使用；
+    - root_squash：登入NFS主机，使用共享目录时相当于目录的拥有者。root用户使用共享目录权限被压缩为匿名使用者，它的UID和GID都会变成nobody；
+    - all_squash：所有用户的身份都会被压缩成为匿名使用者（nobody）；
+- 重启服务器：“sudo service nfs-kernel-server restart”；
+### 1.8.3. 客户端访问
+- 客户端时通过挂载的方式访问目录的；
+- “mount 服务器IP:共享目录路径 /mnt”，“mnt”是挂载到本地的路径，可以修改；
+- 接下来就可以在本地/mnt路径下访问NFS服务器共享路径下的文件了
+## 1.9. SSH服务器
+### 1.9.1. 安装
+- 安装：“sudo atp-get install openssh-server”
+- 查看：“sudo aptitude show openssh-server”
+### 1.9.2. 登陆
+- “ssh UserName@服务器IP”；
+- 登陆过程确认的时候只能写“yes”或“no”，不能用“y”和“n”代替；
+### 1.9.3. 退出
+- logout
+### 1.9.4 scp命令
+- scp命令是超级拷贝的意思；
+- 使用之前openssh-server服务器必须已经安装；
+- “scp -r DescUserName@DescHostIP:/DescFile绝对路径 /本地路径”，确认的时候只能输入“yes”；
+- “-r”递归拷贝，拷贝目录的时候使用；
+## 1.10. 关机重启操作
+### 1.10.1. poweroff
+
+### 1.10.2. reboot
+
+### 1.10.3. shutdown
+#### 1.10.3.1. 参数
+- “-t 秒数”: 设定切换runlevel之前的时间（警告和删除延迟时间）；
+- “-k”: 只发送警告信息, 不真关机；
+- “-r”: 重启；
+- “-h”: shutdown之后关机；
+- “-n”: 不经过init进程,shutdown指令直接关机(不建议使用)；
+- “-f”: 重新开机时, 跳过fsck指令,不检查档案系统；
+- “-F”: 重新开机时, 强迫做fsck检查；
+- “-c”: 取消正在shutdown的动作，必须切换至其它tty才能执行此命令；
+#### 1.10.3.2. 举例
+- “shutdown -r now”：立刻重新开机；
+- “shutdown -h now”：立刻关机；
+- “shutdown -k now "str"”：发出警告讯息, 不真关机；
+- “shutdown -t5 -r now”：立刻重新开机,在警告和删除processes之间,延迟5秒钟；
+- “shutdown -h 15:66 "str"” 15:66关机；
+- “shutdown -r 10 "str"”：10分钟后关机；
+- “shutdown now”：切换至**单人操作模式**；
+
+
 
 
 # 疑问
-1.为什么要修改文件的所有者或所属组？
+1. 为什么要修改文件的所有者或所属组？
+2. tty设备，pts设备怎么理解？（字符终端，桌面终端和设备终端）
+3. free命令简介
