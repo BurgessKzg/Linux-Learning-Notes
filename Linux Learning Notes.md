@@ -673,17 +673,50 @@
 ## 1.18. 系统函数
 &emsp;&emsp;系统函数在man文档的第二章。
 ### 1.18.1. open
+- “int open(const char *pathname, int flags)”
+- “int open(const char *pathname, int flags, mode_t mode)”
+    - patename：文件路径，可以是相对或绝对路径；
+    - flags：打开方式；
+        - O_RDONLY：只读打开，必选，互斥三选一
+        - O_WRONLY：只写打开，必选，互斥三选一
+        - O_RDWR：可读可写打开，必选，互斥三选一
+        - O_APPEND：表示追加，新的内容放到文件末尾，不覆盖原先内容，可选；
+        - O_CREAT：若文件不存在则创建，需要提供mode参数来配置文件权限，另有umask掩码存在；
+        - O_EXCL：和O_CREAT共用，表示文件已存在则报错返回；
+        - O_TRUNC：如果文件已存在，则将其长度截断为0字节；
+        - O_NONBLOCK 设置文件为非阻塞状态
 - 文件权限由open的mode参数和当前进程的umask掩码共同决定
 - 文件存在判断使用O_EXCL和O_CREAT；
-- 文件截断O_TRUNC
+- 文件截断O_TRUNC(就是将文件大小设置为0，清空文件内容)；
 - 设置文件为<font color=red>非阻塞状态：O_NONBLOCK</font>；
+- 报错情况：
+    - 打开文件不存在 
+    - 以写方式打开只读文件(打开文件没有对应权限)
+    - 以<font color=red>只写方式打开目录</font>;
 ### 1.18.2. close
-
+- "int close(int fd)",fd为open函数的返回值；
+- 返回值：
+    - 0：正常关闭
+    - 1：关闭出错，看errno；- 
 ### 1.18.3. read
-
+- “ssize_t read(int fd, void *buf, size_t count)”
+- 从打开的设备或文件中读取数据；
+- 返回值：
+    - \>0：读出的字节数
+    - =0：文件读取完毕
+    - -1：错误，看errno；
 ### 1.18.4. write
-
+- “ssize_t write(int fd, const void *buf, size_t count)”
+- 向打开的设备或文件中写数据；
+- 返回值：
+  - \>=0：写入文件的字节数
+  - -1：错误，看errno
 ### 1.18.5. lseek
+- “off_t lseek(int fd, off_t offset, int whence)”
+- whence参数：
+  - SEEK_SET：从文件头向后偏移，StartPos+offset = 0+offset = offset;
+  - SEEK_CUR：从当前位置向后偏移,CurrPos+offset,offset可正可负； 
+  - SEEK_END：从文件尾部向后偏移，文件长度+offset，offset可正可负；
 - lseek函数作用：
     > 1. 获取文件的大小；
         - len = lseek(fd,0,SEEK_END);
@@ -694,16 +727,177 @@
 
 - 文件拓展的使用场景：加入是多线/进程下载一个10G大小的文件，可以使用文件拓展先占好空间，然后每个线程给指定位置下载数据就行了；
 ## 1.19. 文件操作函数
-### 1.19.1 stat
+### 1.19.1 stat,lstat,fstat
+- 获取文件属性（从inode上获取）
 - 用stat可以实现命令“ls -l”的功能；
 - stat函数会“穿透追踪”文件，lstat不会穿透追踪，lstat遇到软链接，读取的就是软链接的文件的大小；
+- vi编辑器也会穿透操作；
+- "ls -l"和"rm"指令不会穿透操作；
+- fstat是在文件打开之后操作的，传入的是文件描述符；
+```C
+struct stat {
+    dev_t         st_dev;       //文件的设备编号
+    ino_t         st_ino;       //节点
+    mode_t        st_mode;      //文件的类型和存取的权限
+    nlink_t       st_nlink;     //连到该文件的硬连接数目，刚建立的文件值为1
+    uid_t         st_uid;       //用户ID
+    gid_t         st_gid;       //组ID
+    dev_t         st_rdev;      //(设备类型)若此文件为设备文件，则为其设备编号
+    off_t         st_size;      //文件字节数(文件大小)
+    blksize_t     st_blksize;   //块大小(文件系统的I/O 缓冲区大小)
+    blkcnt_t      st_blocks;    //块数
+    time_t        st_atime;     //最后一次访问时间
+    time_t        st_mtime;     //最后一次修改时间
+    time_t        st_ctime;     //最后一次改变时间(指属性)
+};
+```
+- st_mode
+@import "Picture002_st_mode.png"
+### 1.19.2. access
+- 测试指定文件是否拥有某种权限
+- “int access(const char *pathname, int mode)”
+- mode参数：
+  - R_OK：是否有读权限
+  - W_OK：是否有写权限
+  - X_OK：是否有执行权限
+  - F_OK：测试一个文件是否存在
+- 返回值：
+  - 0：所有欲查核的权限都通过了检查
+  - -1：权限被禁止
+### 1.19.3. chmod
+- 改变文件的权限 
+- "int chmod( const char *filename, int pmode )",pmode必须是一个8进制数
+### 1.19.4. chown
+- 改变文件的所有者
+- “int chown(const char *path, uid_t owner, gid_t group)”
+### 1.19.5. rename
+- 文件重命名，<font color=red>是否可移动文件？</font>
+- 头文件：stdio.h
+- "int rename(const char *oldpath, const char *newpath)"
+### 1.19.6. link相关
+#### 1.19.6.1. link
+- 创建一个硬链接
+- “int link(const char *oldpath, const char *newpath)”
+#### 1.19.6.2. symlink
+- 作用：创建一个软连接
+#### 1.19.6.3. readlink
+- 作用：读软连接对应的文件名，不是读内容
+#### 1.19.6.4. unlink
+- 作用：
+  - 删除一个文件的目录项并减少它的链接数，若成功则返回0，否则返回-1，错误原因存于errno。
+  - 如果想通过调用这个函数来成功删除文件，你就必须拥有这个文件的所属目录的写和执行权限。
+- 使用：
+  - 1. 如果是符号链接，删除符号链接
+  - 2. 如果是硬链接，硬链接数减1，当减为0时，释放数据块和inode
+  - 3. 如果文件硬链接数为0，但有进程已打开该文件，并持有文件描述符，则等该进程关闭该文件时，kernel才真正去删除该文件(利用该特性创建临时文件，先open或creat创建一个文件，马上unlink此文件)
+### 1.19.7. truncate
+- 将参数path 指定的文件大小改为参数length 指定的大小。如果原来的文件大小比参数length大，则超过的部分会被删去。
+- "int truncate(const char *path, off_t length)"
+### 1.19.8. dup
+- 文件描述符复制，使得多个文件描述符指向同一个文件；
+- “int dup(int oldfd)”，返回值是新的文件描述符；
+- 返回值是文件描述符表中没有被占用的最小的文件描述符；
+- 虽然有两个文件描述符，但是文件指针只有一个，可以同时写文件；
+### 1.19.9. dup2
+- 文件描述符复制，使得多个文件描述符指向同一个文件；
+- “int dup(int oldfd,int newfd)”
+    - 如果newfd之前已被打开，则该函数会先关闭newfd然后将oldfd的的内容(非文件描述符值)再复制给newfd；
+    - 如果newfd没有打开，直接复制；
+    - 返回值是oldfd的文件描述符值；
+### 1.19.10. fcntl
+- 改变已经打开的文件的属性；
+- 头文件：fcntl.h
+- “int fcntl（int fd, int cmd）”
+- “int fcntl（int fd, int cmd, long arg）”
+- “int fcntl（int fd, int cmd, struct flock *lock）”
+- 功能：
+  - 复制一个现有的描述符，cmd：F_DUPFD
+  - 获得／设置文件描述符标记，cmd：F_SETFD，F_GETFD
+  - 获得／设置异步I/O所有权，cmd：F_GETOWN，F_SETOWN
+  - 获得／设置记录锁，cmd：F_GETLK，F_SETLK，F_SETLKW
+  - 获得／设置文件状态标记，cmd：F_GETFL，F_SETFL
+    - F_SETFL
+      - O_APPEND
+      - O_NONBLOCK
+    - F_GETFL
+      - O_RDONLY
+      - O_WRONLY
+      - O_RDWR
+      - O_EXEC：执行方式打开
+      - O_SEARCH：搜索打开目录
+      - O_APPEND
+      - O_NONBLOCK
 
-####      unlink
-unlink函数可以创建临时文件，引用场景如：看某个视频的时候临时缓存该视频，视频关闭的时候把缓存自动删除；
+## 1.20. 目录操作
+### 1.20.1 chdir
+- 修改当前进程的路径
+- "int chdir(const char *path)"
+### 1.20.2. getwd
+- 获取当前进程工作目录
+- "char *getcwd(char *buf, size_t size)"
+### 1.20.3. mkdir
+- 创建目录
+- "int mkdir(const char *pathname, mode_t mode)"
+- 创建的目录需要有执行权限，否则无法进入目录
+### 1.20.4. rmdir
+- 删除一个空目录
+- "int rmdir(const char *pathname)"
+### 1.20.5. opendir
+- 打开一个目录
+- "DIR *opendir(const char *name)"
+- 返回值：
+  - DIR结构指针，该结构是一个内部结构，保存所打开的目录信息，作用类似于FILE结构
+  - 函数出错返回 NULL
+### 1.20.6. readdir
+- 读目录
+- "struct dirent *readdir(DIR *dirp)"
+- -D_BSD_SOURCE,编译时添加宏定义
+- 返回值：返回一条记录项
+    ```C
+    struct dirent
+    {
+        ino_t  d_ino;// 此目录进入点的inode     
+        ff_t   d_off;// 目录文件开头至此目录进入点的位移
+        signed short int d_reclen; //d_name 的长度,不包含NULL 字符
+        unsigned char d_type;//d_name所指的文件类型 
+        har    d_name[256];//文件名
+    };    
+    ```
+- d_type:
+    - DT_BLK - 块设备
+    - DT_CHR - 字符设备
+    - DT_DIR - 目录
+    - DT_LNK - 软连接
+    - DT_FIFO - 管道
+    - DT_REG - 普通文件
+    - DT_SOCK - 套接字
+    - DT_UNKNOWN - 未知
+
+### 1.20.7. closedir
+- 关闭目录
+
+## 1.21. errno
+### 1.21.1. 定义
+- errno是一个全局变量；
+- 标准C库函数可对其进行修改（Linux系统函数也可以）
+- 类型是：int
+- 作用：记录系统的最后一次错误代码
+    - 每个errno值对应着以字符串表示的错误类型
+    - 当调用"某些"函数出错时，该函数会重新设置 errno 的值
+### 1.21.2. 宏定义
+- 第 1 - 34 个错误定义：/usr/include/asm-generic/errno-base.h
+- 第 35 - 133 个错误定义：/usr/include/asm-generic/errno.h
+### 1.21.3. perror
+- 头文件：stdio.h
+- “void perror(const char *s)”；
+- 作用：
+  - 用来将上一个函数发生错误的原因输出到标准设备(stderr)，此错误原因依照全局变量errno 的值来决定要输出的字符串。
+  - 参数 s 所指的字符串会先打印出,后面再加上错误原因字符串
+
 
 
 strtol函数将“数字字符串”转换成数字；
-
+sprintf函数
 
 
 
@@ -724,8 +918,9 @@ strtol函数将“数字字符串”转换成数字；
 5. export和source的区别？
 6. 文件IO和系统IO的区别？
 7. C库函数和系统函数的区别？
-8. cpu 为什么要使用虚拟地址空间与物理地址空间映射？解决了什么样的问题？
+8. 理解递归的思想，语法中在什么条件下才能使用递归；
+9. cpu 为什么要使用虚拟地址空间与物理地址空间映射？解决了什么样的问题？
     > 答：
         1. 方便编译器和操作系统安排程序的地址分布（程序可以使用一系列相邻的虚拟地址来访问物理内存中不相邻的大内存缓冲区）；
         2. 方便进程之间隔离（不同进程使用的虚拟地址彼此隔离。一个进程中的代码无法更改正在由另一进程使用的物理内存）；
-		3. 方便OS使用你那可怜的内存（程序可以使用一系列虚拟地址来访问大于可用物理内存的内存缓冲区。当物理内存的供应量变小时，内存管理器会将物理内存页（通常大小为 4 KB）保存到磁盘文件。数据或代码页会根据需要在物理内存与磁盘之间移动）。
+		1. 方便OS使用你那可怜的内存（程序可以使用一系列虚拟地址来访问大于可用物理内存的内存缓冲区。当物理内存的供应量变小时，内存管理器会将物理内存页（通常大小为 4 KB）保存到磁盘文件。数据或代码页会根据需要在物理内存与磁盘之间移动）。
