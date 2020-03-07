@@ -1065,7 +1065,67 @@ sprintf函数
 ### 2.4.9. getegid
 - "gid_t getegid(void)"
 - 获取当前进程**有效**用户组ID
+### 2.4.10. 循环创建多个子进程
+```C
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 
+int main(int argv,char* argc[])
+{
+	unsigned int i,cnt;
+	pid_t pid = 0;
+
+	if(argv < 2)
+	{
+		printf("请传入创建子进程个数参数！\n");
+		exit(-1);
+	}
+	printf("进程开始!\n");
+	
+	cnt = strtol(argc[1],NULL,10);
+	printf("要创建的子进程个数为：%d\n",cnt);
+	for(i=0;i<cnt;i++)
+	{
+		pid = fork();
+
+		if(-1 == pid)
+		{
+			perror("创建子进程出错！\n");
+			exit(-1);
+		}
+		if(0 == pid)
+		{
+			break;
+		}
+	}
+	
+	sleep(i);
+
+	if(i<cnt)
+	{
+		
+		printf("我是第%d个子进程\n",i+1);
+	}else
+	{
+		printf("我是父进程！\n");
+	}
+
+	return 0;
+}
+```
+执行效果如下：
+```
+burgesskzg@BkUb:~/testDir/fork$ ./a.out 5
+进程开始!
+要创建的子进程个数为：5
+我是第1个子进程
+我是第2个子进程
+我是第3个子进程
+我是第4个子进程
+我是第5个子进程
+我是父进程！
+```
 
 
 
