@@ -1126,6 +1126,86 @@ burgesskzg@BkUb:~/testDir/fork$ ./a.out 5
 我是第5个子进程
 我是父进程！
 ```
+## 2.5. exec系列函数
+- fork之后，经常要调用exec系列函数，调用一种exec函数后，进程的用户空间代码和数据完全被新程序替换，并从新程序的启动例程开始执行；
+- 调用exec不创建新进程，所以调用exec前后该进程的id不改变 ；
+- exec函数一旦调用成功即执行新程序，不返回,只有失败才返回，错误值-1,所以通常直接在exec函数调用后直接调用perror()和exit()，无需if判断;
+- 只有execve是真正的系统调用，其它五个函数最终都调用execve，execve在man手册第2节，其它函数在man手册第3节
+- 可执行文件可以是二进制文件，也可以是Linux下可执行脚本
+> l:(list) 命令行参数列表
+> p:(path) 搜素file时使用path变量
+> v:(vector) 使用命令行参数数组
+> e:(environment) 使用环境变量数组,不使用进程原有的环境变量，设置新加载程序运行的环境变量
+
+### 2.5.1. execl
+- "int execl(const char *path, const char *arg, ...)"
+- 加载一个进程，通过“路径+程序名”来加载
+- 参数：
+  - path为绝对路径+程序；
+  - argv[0]必须和可执行程序名一样！；
+  - argv[1]之后才为新进程的命令行参数；
+  - 最后一个参数必须为NULL；
+- 该函数可以用来加载一个自定义的程序；
+- eg:execl("/bin/ls","ls","-a","-l",NULL);
+### 2.5.2. execlp
+- "int execlp(const char *file, const char *arg, ...)"
+- 借助环境变量PATH来加载一个进程，当PATH中所有目录搜索后没有参数1(file)则出错返回；
+- 参数：
+  - file为可执行程序名；
+  - argv[0]必须和可执行程序名一样！；
+  - argv[1]之后才为新进程的命令行参数；
+  - 最后有一个参数必须为NULL；
+- 该函数通常用来调用系统程序，如：ls、cp等；
+- eg:execl("ls","ls","-a","-l",NULL);
+### 2.5.3. execle
+- "int execle(const char *path, const char *arg, ..., char *const envp[])"
+- 在envp[]中指定当前进程所使用的环境变量替换掉该进程继承的所有环境变量
+### 2.5.4. execv
+- "int execv(const char *path, char *const argv[])"
+- 将所有参数构造成指针数组传递
+### 2.5.5. execvp
+- "int execvp(const char *file, char *const argv[])"
+- 将所有参数构造成指针数组传递
+### 2.5.6. execve
+- "int execve(const char *path, char *const argv[], char *const envp[])"
+- 在envp[]中指定当前进程所使用的环境变量替换掉该进程继承的所有环境变量
+- 将所有参数构造成指针数组传递
+### 2.5.7. other
+- 在使用exec函数族时，一定要加上错误判断语句。因为exec很容易执行失败，其中最常见的原因有：
+    - 找不到文件或路径，此时errno被设置为ENOENT；
+    - 数组argv和envp忘记用NULL结束，此时errno被设置为EFAULT；
+    - 没有对应可执行文件的运行权限，此时errno被设置为EACCES； 
+- exec后新进程保持原进程以下特征：
+    - 环境变量（使用了execle、execve函数则不继承环境变量）；
+    - 进程ID和父进程ID；
+    - 实际用户ID和实际组ID； 
+    - 附加组ID；
+    - 进程组ID；
+    - 会话ID；
+    - 控制终端；
+    - 当前工作目录；
+    - 根目录；
+    - 文件权限屏蔽字；
+    - 文件锁；
+    - 进程信号屏蔽；
+    - 未决信号；
+    - 资源限制；
+    - tms_utime、tms_stime、tms_cutime以及tms_ustime值;
+- 对打开文件的处理与每个描述符的exec关闭标志值有关，进程中每个文件描述符有一个exec关闭标志（FD_CLOEXEC），若此标志设置，则在执行exec时关闭该描述符，否则该描述符仍打开。除非特地用fcntl设置了该标志，否则系统的默认操作是在exec后仍保持这种描述符打开，利用这一点可以实现I/O重定向 
+```C
+char *const Para[] ={"ls", "-l", "-a", NULL}; 
+char *const Enir[] ={"PATH=/bin:/usr/bin", "TERM=console", NULL}; 
+execl("/bin/ls", "ls", "-l", "-a", NULL); 
+execv("/bin/ls", Para); 
+execle("/bin/ls", "ls", "-l", "-a", NULL, Enir); 
+execve("/bin/ls", Para, Enir); 
+execlp("ls", "ls", "-l", "-a", NULL); 
+execvp("ls", Para);
+```
+
+
+
+
 
 
 
