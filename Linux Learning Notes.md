@@ -1235,9 +1235,9 @@ execvp("ls", Para);
 - 清理指定的PID**子进程**；
 - 参数
   - pid
-    - ">0"：回收指定PID的进程(非子进程可以吗？)；
+    - ">0"：回收指定PID的进程(必须是子进程)；
     - "-1"：回收任意子进程(一次回收一个)；
-    - "0"：回收和当前进程一个组的所有**子进程**(一次回收多个？)；
+    - "0"：回收和当前进程一个组的所有**子进程**(一次回收一个)；
     - "<-1"：回收指定进程组内的<font color=red>所有</font>子进程(一次回收多个？);
   - options
     - "0"：阻塞等待，等同于wait；
@@ -1246,7 +1246,130 @@ execvp("ls", Para);
   - "PID"：返回回收的子进程的PID；
   - "-1"：没有子进程需要回收了？
   - "0"：当参数options为"WNOHANG"时，没有子进程结束时返回0；
+### 2.6.5. waitpid使用疑问
+---
+- waitpid可以回收非血缘关系进程吗？
+```C
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
+int main(int argv,char* argc[])
+{
+	unsigned int i;
+	pid_t pid = 0;
+
+	pid = fork();
+	if(-1 == pid)
+	{
+		perror("创建子进程出错！\n");
+		exit(-1);
+	}else if(0 == pid)
+	{
+		printf("子进程任务!\n");
+		while(-1);
+		printf("子进程任务结束!\n");
+	}else
+	{
+		printf("父进程回收非血缘进程!\n");
+		if(-1 == waitpid(5455,NULL,0))
+		{
+			perror("回收非血缘进程失败!\n");
+		}
+
+		waitpid(pid,NULL,0);
+	}
+
+	return 0;
+}
+```
+结果如下：
+```
+父进程回收非血缘进程!
+回收非血缘进程失败!
+: No child processes
+子进程任务!
+```
+---
+- 当pid的值为0时，每调用一个waitpid一次，回收一个同组子进程还是多个一起回收？
+```C
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+int main(void)
+{
+	unsigned int i;
+	pid_t pid = 0,retPid = 0;
+	pid_t pidArr[5] = {0};
+
+	for(i=0;i<5;i++)
+	{
+		pid = fork();
+
+		if(-1 == pid)
+		{
+			perror("创建子进程出错！\n");
+			exit(-1);
+		}else if(0 == pid)
+		{
+			break;
+		}else
+		{
+			pidArr[i] = pid;
+		}
+	}
+
+	if(i<5)
+	{
+		printf("第%d个子进程在这里循环!\n",i);
+		while(1);
+	}else
+	{
+		for(i=0;i<5;i++)
+		{
+			printf("第%d个子进程的PID是:%d\n",i,pidArr[i]);
+		}
+		for(i=0;i<5;i++);
+		{
+			retPid = waitpid(0,NULL,0);
+			printf("子进程%d被回收!\n",retPid);
+
+		}
+	}
+
+	return 0;
+}
+```
+当程序执行后，用"ps ajx"查看进程组为6365：
+```
+  6365   6366   6365  97805 pts/0      6365 R+    1000   0:05 ./WaitPidTest
+  6365   6367   6365  97805 pts/0      6365 R+    1000   0:05 ./WaitPidTest
+  6365   6368   6365  97805 pts/0      6365 R+    1000   0:05 ./WaitPidTest
+  6365   6369   6365  97805 pts/0      6365 R+    1000   0:05 ./WaitPidTest
+  6365   6370   6365  97805 pts/0      6365 R+    1000   0:05 ./WaitPidTest
+```
+在别的终端用"kill -9 6366 6367"一次杀死多个子进程，结果如下：
+```
+第0个子进程的PID是:6366
+第1个子进程的PID是:6367
+第2个子进程的PID是:6368
+第3个子进程的PID是:6369
+第4个子进程的PID是:6370
+第0个子进程在这里循环!
+第1个子进程在这里循环!
+第3个子进程在这里循环!
+第2个子进程在这里循环!
+第4个子进程在这里循环!
+子进程6366被回收!
+```
+测试发现，如果每次只kill一个子进程，则有几个子进程waitpid执行几次，但当一次kill多个子进程，则只回收一个，<font color=red>父进程直接结束,未kill的子进程称为孤儿进程，需要后续查明原因？</font>
+
+---
 
 执行了exec函数的子进程需要回收吗
 exit参数不能超过128？
