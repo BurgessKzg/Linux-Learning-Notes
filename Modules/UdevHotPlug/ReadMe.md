@@ -113,9 +113,14 @@ FD_ISSET()
 select()
 /***************************************************/
 struct udev
-udev_new()
-udev_ref()
-udev_unref()
+udev_new() :创建udev library context,udev library context采用引用记数机制，创建默认记数为1;
+udev_ref()：增加引用记数
+udev_unref()：减少引用记数，如果引用记数为0，则释放内部资源
+/***************************************************/
+udev_enumrate_new()：创建一个枚举器，用于扫描系统已接设备
+udev_enumrate_ref()：增加引用记数
+udev_enumrate_unref：减少引用记数
+udev_enumrate_add_match/nomatch_xxx
 /***************************************************/
 struct udev_device
 udev_device_get_action()
@@ -136,7 +141,7 @@ udev_monitor_get_fd()
 udev_monitor_receive_device()
 udev_monitor_unref()
 
-
+https://blog.csdn.net/u012247418/article/details/80555556
 
 
 
