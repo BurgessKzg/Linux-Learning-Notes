@@ -1380,28 +1380,78 @@ while的判断条件必须大于0？-1也不行？
 
 
 
+>删除从windows拷贝文件到ubuntu中多了的"^M"：
+使用vi编辑末行模式替换：
+:%s/^M/\r/g
+用来把^M换成回车，注意的是^M要使用CTRL-V CTRL-M生成，而不是直接键入^M
 
 
+pos = str.find("\t")，pos必须定义为 string::size_type，
+最好的办法是直接比较：if (str.find("\t") == string::npos) { … } 
+ c++中 npos 是这样定义的：static const size_type npos = -1;
+ string::size_type 由字符串配置器 allocator 定义
+ (unsigned long)-1 和 (unsigned short)-1 不同，类似原因有时都是-1却返回false；
 
 
+cat /proc/mounts得到当前系统挂载的文件系统：
+ /dev/mmcblk1p1 /sdcard vfat rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro 0 0
+后面的选项是什么意思？不同平台/proc/mounts的输出格式都是这样的吗？
 
 
+struct timeval time_start, time_end;
+gettimeofday(&time_start, nullptr);
+  AM_SYSTEM(cmd);
+gettimeofday(&time_end, nullptr);
 
 
+#include<unistd.h>
+void sync(void);
+int fsync(int filedes);
+int fdatasync(int filedes);
+返回值：若成功则返回0,出错则返回 -1
+sync 函数只是将所有修改过的块缓冲区排入写队列，然后就返回，它并不等待实际写磁盘操作结束。
+通常称为 update的系统守护进程会周期性的（一般每隔30秒）调用sync函数。保证了定期冲洗内核的块缓冲区。命令 sync也调用sync函数。
+fsync函数只对由文件描述符 filedes 指定的单一文件起作用，并且等待写磁盘操作结束，然后返回。
+fdatasync函数类似于 fsync，但它只影响文件的数据部分。
+
+
+"echo 3 > /proc/sys/vm/drop_caches":手动清除缓存cache
+Buffers:被OS buffer（written to disk）住的内存.buffer用于存放要输出到disk(块设备)的数据
+Cache：存放从disk上读出的数据。 Buffer和cache是为了提高IO性能并由OS管理
+-buffer/cache：一个应用程序认为系统被用掉多少内存；=used-buffers-cached
++buffer/cache：一个应用程序认为系统还有多少内存； = ? + buffers+cached
+Free命令读取的数据都是从：cat /proc/meminfo中读取的
+
+使用dd指令，对磁盘进行连续写入，不使用内存缓冲区，每次写入8k的数据，总共写入20万次，产生1.6G大小的文件。
+dd if=/dev/zero of=/data01/test.dbf bs=8k count=200000 conv=fdatasync
 
 ## 疑问
 1. 嵌入式开发中，MMU的映射表谁来设置填写？
 2. 命令行参数是什么？boot给kernel传递的又是什么？
 3. UTF-8代表简体中文；
+4. 用户空间的程序与设备通信的方法：
+  - 通过ioperm获取操作IO端口的权限，然后用inb/inw/ inl/ outb/outw/outl等函数，避开设备驱动程序，直接去操作IO端口？
+  - 用ioctl函数去操作/dev目录下对应的设备，这是设备驱动程序提供的接口。像键盘、鼠标和触摸屏等输入设备一般都是这样做的？
+  - 用write/read/mmap去操作/dev目录下对应的设备，这也是设备驱动程序提供的接口。像framebuffer等都是这样做的？
+5. system()函数和exec系列函数的区别？
+6. 哪些函数必须要调用chdir之后才能执行成功？
+  - stat?
+  - scandir?
+7. snprintf和printf和put等？
+8. stat函数传入路径不存在会怎么办？
 
 
 
 
+金步国：http://www.jinbuguo.com/
+https://www.iteye.com/blog/elf8848-2088986
 
+内核编程规范和代码风格：https://www.cnblogs.com/trav/p/10356415.html
 
-
-
-
+阅读一篇DDR文档；
+阅读一篇解串器文档；
+阅读一篇摄像头sensor文档；
+阅读一篇视频编解码文档；
 
 
 
