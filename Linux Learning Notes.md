@@ -1584,7 +1584,64 @@ int main(void)
   - 用静态数据结构
   - 调用了malloc或free
   - <font color=red>标准I/O函数</font>
-
+#### 2.7.3.8. SIGCHLD
+##### 2.7.3.8.1. 产生条件
+- 子进程结束；
+- 子进程收到SIGSTOP；
+- 子进程收到SIGCONT(总之就是子进程状态改变)；
+##### 2.7.3.8.2. 动作
+- 默认动作是忽略；
+- 可以捕捉该信号，在信号处理函数中回收子进程，(wait或waitpid)的结果是正确结束，不是信号打断！
+- 多子进程回收情况建议在信号处理函数中使用while来回收一组，避免僵尸进程；
+- "pid_t waitpid(pid_t pid, int *status, int options)"
+  - options
+    - WNOHANG:没有子进程结束，立即返回
+    - WUNTRACED:如果子进程由于被停止产生的SIGCHLD，waitpid则立即返回
+    - WCONTINUED:如果子进程由于被SIGCONT唤醒而产生的SIGCHLD，waitpid则立即返回
+  - 获取status
+    - WIFEXITED(status):子进程正常exit终止，返回真
+      - WEXITSTATUS(status)返回子进程正常退出值
+    - WIFSIGNALED(status):子进程被信号终止，返回真
+      - WTERMSIG(status)返回终止子进程的信号值
+    - WIFSTOPPED(status)子进程被停止，返回真
+      - WSTOPSIG(status)返回停止子进程的信号值
+    - WIFCONTINUED(status)
+#### 2.7.3.9. 信号传参
+##### 2.7.3.9.1. sigqueue
+- "int sigqueue(pid_t pid, int sig, const union sigval value)",成功返回0,失败返回-1并设置errno
+```C
+union sigval 
+{
+  int   sival_int;
+  void *sival_ptr;
+};
+```
+- 向指定进程发送指定信号的同时，携带数据
+- 如传地址，需注意不同进程之间虚拟地址空间各自独立，将当前进程地址传递给另一进程没有实际意义，多用于将自己进程传参，实现回调；
+##### 2.7.3.9.2. sigaction
+- "int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)"
+```C
+struct sigaction 
+{
+void     (*sa_handler)(int);
+void     (*sa_sigaction)(int, siginfo_t *, void *);
+sigset_t   sa_mask;
+int       sa_flags;
+};
+```
+- 当注册信号捕捉函数使用sa_sigaction可获取更多信息。但此时的sa_flags必须指定为SA_SIGINFO。siginfo_t可以携带各种与信号相关的数据
+#### 2.7.3.10. 中断系统调用
+- 系统调用可分为两类：慢速系统调用和其他系统调用
+- 慢速系统调用：会使进程永远阻塞，在阻塞期间收到一个信号，该系统调用被中断,不再继续执行(早期)，也可以设定系统调用是否重启。如，read、write、pause、wait、waitpid等
+- 其他系统调用：getpid、getppid、fork等
+- pause的行为
+  - 想中断pause，信号不能被屏蔽
+  - 信号的处理方式必须是捕捉 (默认、忽略都不可以）
+  - 中断后返回-1， 设置errno为EINTR(表“被信号中断”)
+  - 可修改struct sigaction的sa_flags参数来设置被信号中断后系统调用是否重启
+    - SA_INTERRURT不重启
+    - SA_RESTART重启
+    - SA_NODEFER在执行捕捉函数期间，不希望自动阻塞该信号(除非sa_mask中包含该信号)
 #### 2.7.3.x. 注意
 - 内核回调执行捕捉函数结束之后会调用系统调用sysreturn先返回内核；
 - SIGKILL和SIGSTOP信号不允许屏蔽、忽略和捕捉，只能执行默认动作。
@@ -1593,6 +1650,8 @@ int main(void)
 - 不存在0号信号
 - 有些信号由于平台不同导致有多个编号，所以建议使用的时候使用名称，便于兼容； 
 - root用户可以发送信号给任意用户，普通用户只能给自己创建的进程发送信号，给其他普通用户也不能发送信号；
+- 子进程继承了父进程的信号屏蔽字和信号处理动作，但子进程没有继承未决信号集
+- 应该在fork之前，阻塞SIGCHLD信号。注册完捕捉函数后解除阻塞
 #### 2.7.3.x. 疑问
 - 利用sigaddset设置9和19号信号，未决信号集不被信号屏蔽字影响，那信号屏蔽字对应位设置了吗？
 - 怎么获取信号屏蔽字(阻塞信号集)的状态，只能获取未决信号集来判断吗？
