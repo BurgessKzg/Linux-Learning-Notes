@@ -112,46 +112,159 @@ FD_SET()
 FD_ISSET()
 select()
 /***************************************************/
-struct udev
+结构体udev：保存从配置文件读取的默认值
+struct udev {
+ int refcount;
+ void (*log_fn)(struct udev *udev,
+         int priority, const char *file, int line, const char *fn,
+         const char *format, va_list args);
+ void *userdata;
+ char *sys_path;
+ char *dev_path;
+ char *rules_path;
+ char *run_config_path;
+ char *run_path;
+ struct udev_list_node properties_list;
+ int log_priority;
+};
 udev_new() :创建udev library context,udev library context采用引用记数机制，创建默认记数为1;
 udev_ref()：增加引用记数
 udev_unref()：减少引用记数，如果引用记数为0，则释放内部资源
 /***************************************************/
-udev_enumrate_new()：创建一个枚举器，用于扫描系统已接设备
-udev_enumrate_ref()：增加引用记数
-udev_enumrate_unref：减少引用记数
-udev_enumrate_add_match/nomatch_xxx
+结构体udev_list_entry：设备链表入口
+struct udev_list_entry {
+ struct udev_list_node node;
+ struct udev *udev;
+ struct udev_list_node *list;
+ char *name;
+ char *value;
+ int num;
+};
+udev_list_entry_foreach()
+udev_list_entry_get_name()
+udev_list_entry_get_value()
 /***************************************************/
-struct udev_device
+结构体udev_device：udev设备链表
+struct udev_device {
+ struct udev *udev;
+ struct udev_device *parent_device;
+ char *syspath;
+ const char *devpath;
+ char *sysname;
+ const char *sysnum;
+ char *devnode;
+ mode_t devnode_mode;
+ char *subsystem;
+ char *devtype;
+ char *driver;
+ char *action;
+ char *devpath_old;
+ char *knodename;
+ char *id_filename;
+ char **envp;
+ char *monitor_buf;
+ size_t monitor_buf_len;
+ struct udev_list_node devlinks_list;
+ struct udev_list_node properties_list;
+ struct udev_list_node sysattr_value_list;
+ struct udev_list_node sysattr_list;
+ struct udev_list_node tags_list;
+ unsigned long long int seqnum;
+ unsigned long long int usec_initialized;
+ int timeout;
+ int devlink_priority;
+ int refcount;
+ dev_t devnum;
+ int ifindex;
+ int watch_handle;
+ int maj, min;
+ bool parent_set;
+ bool subsystem_set;
+ bool devtype_set;
+ bool devlinks_uptodate;
+ bool envp_uptodate;
+ bool tags_uptodate;
+ bool driver_set;
+ bool info_loaded;
+ bool db_loaded;
+ bool uevent_loaded;
+ bool is_initialized;
+ bool sysattr_list_read;
+ bool db_persist;
+};
 udev_device_get_action()
 udev_device_get_devpath()
 udev_device_get_subsystem()
 udev_device_get_properties_list_entry()
 udev_device_unref()
 /***************************************************/
-struct udev_list_entry
-udev_list_entry_foreach()
-udev_list_entry_get_name()
-udev_list_entry_get_value()
-/***************************************************/
-struct udev_monitor
+结构体udev_monitor：udev设备事件源
+struct udev_monitor {
+ struct udev *udev;
+ int refcount;
+ int sock;
+ struct sockaddr_nl snl;
+ struct sockaddr_nl snl_trusted_sender;
+ struct sockaddr_nl snl_destination;
+ struct sockaddr_un sun;
+ socklen_t addrlen;
+ struct udev_list_node filter_subsystem_list;
+ struct udev_list_node filter_tag_list;
+ bool bound;
+};
 udev_monitor_new_from_netlink()
 udev_monitor_enable_receiving()
 udev_monitor_get_fd()
 udev_monitor_receive_device()
 udev_monitor_unref()
+/***************************************************/
+结构体udev_enumerate：查找和排序sys设备
+struct udev_enumerate {
+ struct udev *udev;
+ int refcount;
+ struct udev_list_node sysattr_match_list;
+ struct udev_list_node sysattr_nomatch_list;
+ struct udev_list_node subsystem_match_list;
+ struct udev_list_node subsystem_nomatch_list;
+ struct udev_list_node sysname_match_list;
+ struct udev_list_node properties_match_list;
+ struct udev_list_node tags_match_list;
+ struct udev_device *parent_match;
+ struct udev_list_node devices_list;
+ struct syspath *devices;
+ unsigned int devices_cur;
+ unsigned int devices_max;
+ bool devices_uptodate:1;
+ bool match_is_initialized;
+};
+udev_enumrate_new()：创建一个枚举器，用于扫描系统已接设备
+udev_enumrate_ref()：增加引用记数
+udev_enumrate_unref：减少引用记数
+udev_enumrate_add_match/nomatch_xxx
+/***************************************************/
+结构体udev_queue：存取当前活动事件
+struct udev_queue {
+ struct udev *udev;
+ int refcount;
+ struct udev_list_node queue_list;
+ struct udev_list_node failed_list;
+};
+/***************************************************/
+
+
 
 https://blog.csdn.net/u012247418/article/details/80555556
 
 
+http://www.360doc.com/content/18/0830/22/2245786_782535165.shtml
 
 
 
 
 
-
-
+NETLINK：一种特殊类型的socket，专门用于内核空间与用户空间的异步通信。
 如果多个线程都对udev的监视窗口监控，当事件发生的时候是每个线程都能收到还是只有一个线程能收到事件？
+外部硬件设备在/dev目录下对应的设备文件是由谁创建的？是驱动自己建的还是udev建的？
 
 
 
