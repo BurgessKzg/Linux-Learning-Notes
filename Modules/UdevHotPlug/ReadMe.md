@@ -30,7 +30,18 @@ udev 是通过对内核产生的设备文件修改，或增加别名的方式来
 systemd和udevd进程关系？systemctl命令可对udev做什么处理？
 
 udev配置文件：/etc/udev/udev.conf
-udev规则文件：/etc/udev/rules.d/*
+udev规则文件：
+    用户自定义目录：/etc/udev/rules.d/*
+    UDEV默认规则文件目录：/lib/udev/rules.d(安霸CV22平台在/usr/lib/udev/rules.d下也发现相同文件且一一关联)
+    UDEVD运行时动态添加的规则目录：/run/udev/rules.d(在安霸CV22平台下没有该子目录，可见该子目录非必须)
+
+在/lib/udev/rules.d目录下有一个"60-persistent-storage.rules"规则文件，该规则文件会根据存储设备的自身信息在/dev/disk/目录下创建存储设备的设备文件的链接文件，刚开始看在/dev/disk/by-label/目录下有一个对SD卡的链接，看了这个规则文件一直以为"ENV{ID_FS_LABEL_ENC}=="?*", SYMLINK+="disk/by-label/$env{ID_FS_LABEL_ENC}""中的ID_FS_LABEL_ENC指的是环境变量，后来才知道，这个是存储设备自身的信息，再格式化的时候可以给设备创建label信息；
+在安霸CV22平台给sd卡创建一个label(假设叫SD_DISK)的方法：
+mkfs.vfat -v -n SD_DISK /dev/mmcblk1p1  ，不过需要注意的是该指令会格式化SD卡，注意备份SD中文件！
+应该是有只设置标签不格式化的指令，后续在究...
+但是这种方法是针对单一SD卡的LABEL方式链接，客户手里面的SD卡不能格式化之后给建立LABEL，想到的办法还是针对平台来实现：
+可以在/etc/udev/rules.d/目录下专门建一个SD的规则文件，其中一行匹配内容如下：
+KERNELS=="*e0005000*" , ACTION=="add", SYMLINK+="DVR_SD_DISK" ，这里根据硬件设计中SD卡槽对应的SD控制器寄存器基址为e0005000来创建链接。该平台有两个SD卡控制器，SD0可以做eMMC boot使用，所有一般SD1用来驱动SD卡，如果两个控制器都做SD卡驱动，可再设计。
 
 规则文件的作用：
     关键字：键-值对，匹配键，赋值键，操作符

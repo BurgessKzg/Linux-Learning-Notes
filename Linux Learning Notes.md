@@ -1783,6 +1783,21 @@ Cache：存放从disk上读出的数据。 Buffer和cache是为了提高IO性能
 +buffer/cache：一个应用程序认为系统还有多少内存； = ? + buffers+cached
 Free命令读取的数据都是从：cat /proc/meminfo中读取的
 
+
+查看进程内存使用情况：
+ps aux
+top
+free
+pmap
+cat /proc/pid/smaps
+cat /proc/pid/maps
+cat /proc/pid/statm
+
+
+SOC的地址空间只有4G，那它是怎么管理8G的eMMC的？
+SOC的启动过程到底是什么样的？
+
+
 使用dd指令，对磁盘进行连续写入，不使用内存缓冲区，每次写入8k的数据，总共写入20万次，产生1.6G大小的文件。
 dd if=/dev/zero of=/data01/test.dbf bs=8k count=200000 conv=fdatasync
 
@@ -1828,8 +1843,9 @@ https://www.iteye.com/blog/elf8848-2088986
 阅读一篇解串器文档；
 阅读一篇摄像头sensor文档；
 阅读一篇视频编解码文档；
+阅读shell脚本编程；
+阅读lua编程；
 
 
 
-
-
+<div style="font-size: 9px; margin-left: 1cm;"> <span class='pageNumber'></span> / <span class='totalPages'></span></div><div style="font-size: 9px; margin-left: auto; margin-right: 1cm; "> <span class=“say”>BurgessKzg</span></div>
