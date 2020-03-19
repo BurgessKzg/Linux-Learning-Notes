@@ -280,6 +280,80 @@ NETLINK：一种特殊类型的socket，专门用于内核空间与用户空间�
 
 
 
+1. 驱动在控制器中的存放目录有：/lib/modules/4.14.139/kernel/drivers/usb/gadget/legacy/
+
+2. sdcard接入打印的路径信息：
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e0005000.sdmmc1
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e0005000.sdmmc1/mmc_host/mmc1
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e0005000.sdmmc1/mmc_host/mmc1/mmc1:aaaa
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e0005000.sdmmc1/mmc_host/mmc1/mmc1:aaaa/block/mmcblk1
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e0005000.sdmmc1/mmc_host/mmc1/mmc1:aaaa/block/mmcblk1/mmcblk1p1
+
+
+sdcard拔出回调打印的路径信息：
+Get sd card remove event
+event_path: /devices/platform/e0000000.n_ahb/e0004000.sdmmc0/mmc_host/mmc0/mmc0:aaaa/block/mmcblk0/mmcblk0p1
+Get sd card remove event
+event_path: /devices/platform/e0000000.n_ahb/e0004000.sdmmc0/mmc_host/mmc0/mmc0:aaaa/block/mmcblk0
+Get sd card remove event
+event_path: /devices/platform/e0000000.n_ahb/e0004000.sdmmc0/mmc_host/mmc0/mmc0:aaaa
+
+3. U盘接入和拔出的打印信息
+
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e001f000.ehci/usb1/1-1/1-1.3
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e001f000.ehci/usb1/1-1/1-1.3/1-1.3:1.0
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e001f000.ehci/usb1/1-1/1-1.3/1-1.3:1.0/host1
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e001f000.ehci/usb1/1-1/1-1.3/1-1.3:1.0/host1/scsi_host/host1
+Get sd card add event
+event_path: /devices/platform/[  167.726993]  sdb: sdb1
+e0000000.n_ahb/e001f000.ehci/usb1/1-1/1-1.3/1-1.3:1.0/host1/target1:0[  167.733736] sd 1:0:0:0: [sdb] Attached SCSI removable disk
+:0
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e001f000.ehci/usb1/1-1/1-1.3/1-1.3:1.0/host1/target1:0:0/1:0:0:0
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e001f000.ehci/usb1/1-1/1-1.3/1-1.3:1.0/host1/target1:0:0/1:0:0:0/scsi_disk/1:0:0:0
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e001f000.ehci/usb1/1-1/1-1.3/1-1.3:1.0/host1/target1:0:0/1:0:0:0/scsi_device/1:0:0:0
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e001f000.ehci/usb1/1-1/1-1.3/1-1.3:1.0/host1/target1:0:0/1:0:0:0/bsg/1:0:0:0
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e001f000.ehci/usb1/1-1/1-1.3/1-1.3:1.0/host1/target1:0:0/1:0:0:0/block/sdb
+Get sd card add event
+event_path: /devices/platform/e0000000.n_ahb/e001f000.ehci/usb1/1-1/1-1.3/1-1.3:1.0/host1/target1:0:0/1:0:0:0/block/sdb/sdb1
+
+
+
+# 2. 疑问
+
+1. usb_otg_mount接口通过判断文件"/sys/class/udc/e0006000.udc/device/gadget/lun0/file"是否存在，就能判断usb是否已经通过otg方式挂载了，这个是什么原理？为什么是这个文件?
+
+2. 如果之前还没写完，file不够20M，而dd命令要读20M会发生什么？
+
+3. sync();//Bk?:这个同步是什么作用，不应该是写的时候同步？
+
+4. AM_SYSTEM("echo 3 >/proc/sys/vm/drop_caches");//Bk?:"手动清除缓存cache"什么作用,不清除对测试有影响吗？
+
+5. //Bk?:怎么确定"sdmmc"就能是sd卡事件？那usb事件使用哪个字符串可以确定？
+
+6. 对于冷启动，怎么在存储管理中触发uevnet来调用注册的回调函数？
+可以使用命令"udevadm"(usr/bin/udevadm)与udev交互，trigger 从内核请求events
+遍历sysfs设备文件
+内核再次向用户空间发送KOBJ_ADD类型的uevent消息："udevadm trigger --action=add",这条命令其实会遍历sysfs文件系统devices下的uevent文件（/sys/devices/***/uevent），然后写入字符串“add”（手动执行echoadd > /sys/devices/***/uevent也可以达到同样的效果）
+
+
+http://www.360doc.com/content/18/0830/22/2245786_782535165.shtml
+http://www.jinbuguo.com/systemd/udevadm.html#
+https://www.runoob.com/cprogramming/c-standard-library-stdio-h.html
+https://www.baidu.com/s?ie=utf-8&f=8&rsv_bp=1&tn=monline_3_dg&wd=error%3A%20impossible%20constraint%20in%20%E2%80%98asm%E2%80%99&oq=error%253A%2520impossible%2520constraint%2520in%2520%25E2%2580%2598asm%25E2%2580%2599%2520%253A%2520%2526quot%253Bmemory%2526quot%253B)%253B&rsv_pq=94c288000006c5cd&rsv_t=bd43rF5NublIew4JRzX0t48I3zMhpgNWvTxbgpaFnk2oB9oHLd9T%2FzXgQI7TwaqGOu%2Fx&rqlang=cn&rsv_enter=1&rsv_dl=tb&rsv_n=2&rsv_sug2=0&inputT=714&rsv_sug4=1374
 
 
 
