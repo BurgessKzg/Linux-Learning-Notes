@@ -283,6 +283,10 @@
 - 文件替换：“%s/SrcStr/DescStr/g”
 - 某几行替换：“LineStart,LineEnds/SrcStr/DescStr/g”
 - 执行命令：“:!命令”
+- >删除从windows拷贝文件到ubuntu中多了的"^M"：
+使用vi编辑末行模式替换：
+:%s/^M/\r/g
+用来把^M换成回车，注意的是^M要使用CTRL-V CTRL-M生成，而不是直接键入^M
 ### 1.3.3. 快捷键
 - h
 - j
@@ -318,6 +322,7 @@
 - ZZ：命令模式下保存退出
 - x或wg：末行模式下保存退出；
 - %：在结构体开始和结束位置切换；
+- gg=G：排版(格式化代码)，也可以line1+gg+=+line2+gg排版这个区间
 ## 1.4. 目录结构
 - /：根目录；
 - /usr：用户应用程序和文件存放目录；
@@ -1732,101 +1737,293 @@ int       sa_flags;
 - 每次fork，子进程的组ID不等于父进程的组ID？比如bash执行程序时？
 - 创建会话的进程它的进程组ID会改变？
 ## 2.8. 线程
+### 2.8.1. 概念
+- 轻量级的进程，有线程号和线程ID之分；
+- 有自己的PCB，但是和其他线程共享地址空间，线程是最小的执行单位，进程是最小的资源分配单位；
+### 2.8.2. 原理
+- 线程和进程在底层都调用clone()函数；
+- 线程有自己的PCB，但是同一个线程组里的线程PCB指向相同的三级页表(linux内核不区分线程和进程，只在用户空间区分)；
+- 创建线程的进程在线程创建之后自身也编程一个线程；
+- 线程可看作是寄存器和栈的集合；
+- 线程是最小执行单位，进程是最小分配资源单位(Linux内核中，其他OS不一定)
+- "ps -Lf [pid]"可以产看线程号(LWP)
+### 2.8.3. 资源
+- 共享资源
+  - 文件描述符表
+  - 信号处理方式
+  - 工作目录
+  - 用户ID和组ID
+  - 内存地址空间(.bss段、.text段、.data段、heap堆和共享库)
+  - 线程间共享全局变量，进程不共享全局变量，只能借助mmap；
+- 非共享资源
+  - 线程ID
+  - 处理器现场和栈指针(内核栈)
+  - 独立的栈空间(用户空间栈)
+  - errno变量
+  - 信号屏蔽字
+  - 调度优先级
+### 2.8.4. 优缺点
+- 优点
+  - 提高程序并发性
+  - 数据共享方便
+  - 开销小
+- 缺点
+  - 对信号支持不好
+  - 库函数，不稳定
+  - 编写困难，不支持GDB调式
+### 2.8.5. 控制原语
+#### 2.8.5.1. pthread_self
+- "pthread_t pthread_self(void)",没有失败的情况，返回调用该函数的线程的ID；
+  - pthread_t在linux中是无符号整数(%lu)；
+  - 线程ID是进程内部的识别标志，和线程号LWP不同，两个进程间的线程ID允许相同；
+  - <font color=red>不应使用全局变量 pthread_t tid在子线程中通过pthread_create传出参数来获取线程ID，而应使用pthread_self</font>
+#### 2.8.5.2. pthread_create
+- "int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg)",成功返回0，失败直接返回错误号！
+  - thread：传出参数，保存系统为我们分配好的线程ID；
+  - attr：通常传NULL表示使用线程默认属性，若想使用具体属性也可以修改该参数；
+  - start_routine：函数指针，指向线程主函数(线程体)，该函数运行结束，则线程结束；
+  - arg：线程主函数执行期间所使用的参数
+#### 2.8.5.3. pthread_exit
+- "void pthread_exit(void *retval)",retval表示线程退出状态，通常传NULL;
+  - 将单个线程退出,线程中，禁止使用exit函数，会导致进程内所有线程全部退出;
+  - pthread_exit或者return返回的指针所指向的内存单元必须是全局的或者是用malloc分配的，不能在线程函数的栈上分配，因为当其它线程得到这个返回指针时线程函数已经退出了
+#### 2.8.5.4. pthread_join
+- "int pthread_join(pthread_t thread, void **retval)",成功返回0，失败直接返回错误号！
+  - thread：线程ID
+  - retval：存储线程结束状态
+  - 调用该函数的线程将挂起等待，直到ID为thread的线程终止；
+    - 如果thread线程通过return返回，retval所指向的单元里存放的是thread线程函数的返回值；
+    - 如果thread线程被别的线程调用pthread_cancel异常终止掉，retval所指向的单元里存放的是常数PTHREAD_CANCELED
+    - 如果thread线程是自己调用pthread_exit终止的，retval所指向的单元存放的是传给pthread_exit的参数；
+    - 如果对thread线程的终止状态不感兴趣，可以传NULL给retval参数
+#### 2.8.5.5. pthread_detach
+- "int pthread_detach(pthread_t thread)",成功返回0，失败直接返回错误号！
+  - 实现线程分离(线程主动与主控线程断开关系。线程结束后，其退出状态不由其他线程获取，而直接自己自动释放。网络、多线程服务器常用)
+  - 也可使用 pthread_create函数参2(线程属性)来设置线程分离
+#### 2.8.5.6. pthread_cancel
+- "int pthread_cancel(pthread_t thread)"，成功返回0，失败直接返回错误号！
+  - 杀死(取消)线程
+  - 线程的取消并不是实时的，而有一定的延时。需要等待线程到达某个取消点(检查点)
+  - 取消点：是线程检查是否被取消，并按请求进行动作的一个位置，通常是一些系统调用creat，open，pause，close，read，write..... 执行命令man 7 pthreads可以查看具备这些取消点的系统调用列表
+  - 如线程中没有取消点，可以通过调用pthread_testcancel函数自行设置一个取消点
+  - 被取消的线程退出值定义在Linux的pthread库中。常数PTHREAD_CANCELED的值是-1。可在头文件pthread.h中找到它的定义：#define PTHREAD_CANCELED ((void *) -1)。因此当我们对一个已经被取消的线程使用pthread_join回收时，得到的返回值为-1
+  - 终止某个线程而不终止整个进程，有三种方法
+    - 从线程主函数return。这种方法对主控线程不适用，从main函数return相当于调用exit;
+    - 	一个线程可以调用pthread_cancel终止同一进程中的另一个线程;
+    - 线程可以调用pthread_exit终止自己。
+#### 2.8.5.7. pthread_equal
+- "int pthread_equal(pthread_t t1, pthread_t t2)"
+- 比较两个线程ID是否相等
+#### 2.8.5.8. 对比
+| 进程 | 线程 |
+|:---:|:---:|
+|fork|pthread_create|
+|exit|pthread_exit|
+|wait|pthread_join|
+|kill|phtread_cancel|
+|gitpid|pthread_self|
+### 2.8.6. 线程属性
+#### 2.8.6.1. 结构体
+typedef struct
+{
+  &emsp;&emsp;int 					etachstate; 	//线程的分离状态
+  &emsp;&emsp;int 					schedpolicy; 	//线程调度策略
+  &emsp;&emsp;struct sched_param	schedparam; 	//线程的调度参数
+  &emsp;&emsp;int 					inheritsched; 	//线程的继承性
+  &emsp;&emsp;int 					scope; 		//线程的作用域
+  &emsp;&emsp;size_t 				guardsize; 	//线程栈末尾的警戒缓冲区大小
+  &emsp;&emsp;int					stackaddr_set; //线程的栈设置
+  &emsp;&emsp;void* 				stackaddr; 	//线程栈的位置
+  &emsp;&emsp;size_t 				stacksize; 	//线程栈的大小
+} pthread_attr_t;
+- 属性值不能直接设置，须使用相关函数进行操作，初始化的函数为pthread_attr_init，这个函数必须在pthread_create函数之前调用。之后须用pthread_attr_destroy函数来释放资源
+- 默认的属性为非绑定、非分离、缺省的堆栈、与父进程同样级别的优先级
+#### 2.8.6.2. 属性初始化
+- "int pthread_attr_init(pthread_attr_t *attr)",成功返回0，失败直接返回错误号！
+- 初始化线程属性
+- 应先初始化线程属性，再pthread_create创建线程
+#### 2.8.6.3. 属性销毁
+- "int pthread_attr_destroy(pthread_attr_t *attr)",成功返回0，失败直接返回错误号！
+- 销毁线程属性所占用的资源
+#### 2.8.6.4. 分离状态设置
+- "int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate)",设置线程属性为分离或非分离状态，
+- "int pthread_attr_getdetachstate(pthread_attr_t *attr, int *detachstate)",获取线程的分离状态；
+- PTHREAD_CREATE_DETACHED：分离线程
+- PTHREAD _CREATE_JOINABLE：非分离线程
+- 非分离状态：线程的默认属性是非分离状态，这种情况下，原有的线程等待创建的线程结束。只有当pthread_join()函数返回时，创建的线程才算终止，才能释放自己占用的系统资源
+- 分离状态：分离线程没有被其他的线程所等待，自己运行结束了，线程也就终止了，马上释放系统资源
+- 注意，如果设置一个线程为分离线程，而这个线程运行又非常快，它很可能在pthread_create函数返回之前就终止了，它终止以后就可能将线程号和系统资源移交给其他的线程使用，这样调用pthread_create的线程就得到了错误的线程号。要避免这种情况可以采取一定的同步措施，最简单的方法之一是可以在被创建的线程里调用pthread_cond_timedwait函数，让这个线程等待一会儿，留出足够的时间让函数pthread_create返回。设置一段等待时间，是在多线程编程里常用的方法。但是注意不要使用诸如wait()之类的函数，它们是使整个进程睡眠，并不能解决线程同步的问题
+#### 2.8.6.5. 栈地址设置
+- "int pthread_attr_setstack(pthread_attr_t *attr, void *stackaddr, size_t stacksize)",成功返回0，失败直接返回错误号！
+- "int pthread_attr_getstack(pthread_attr_t *attr, void **stackaddr, size_t *stacksize)",成功返回0，失败直接返回错误号！
+- 当进程栈地址空间不够用时，指定新建线程使用由malloc分配的空间作为自己的栈空间
+- POSIX.1定义了两个常量_POSIX_THREAD_ATTR_STACKADDR 和_POSIX_THREAD_ATTR_STACKSIZE检测系统是否支持栈属性。也可以给sysconf函数传递_SC_THREAD_ATTR_STACKADDR或 _SC_THREAD_ATTR_STACKSIZE来进行检测
+#### 2.8.6.6. 栈大小设置
+- "int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)",成功返回0，失败直接返回错误号！
+- "int pthread_attr_getstacksize(pthread_attr_t *attr, size_t *stacksize)",成功返回0，失败直接返回错误号！
+- 当系统中有很多线程时，可能需要减小每个线程栈的默认大小，防止进程的地址空间不够用，当线程调用的函数会分配很大的局部变量或者函数调用层次很深时，可能需要增大线程栈的默认大小。
+#### 2.8.6.7. NPTL
+- NPTL实现机制(POSIX)，Native POSIX Thread Library
+- 察看当前pthread库版本getconf GNU_LIBPTHREAD_VERSION
+- 使用线程库时gcc指定 –lpthread
+#### 2.8.7. 注意事项
+- 主线程退出其他线程不退出，主线程应调用pthread_exit
+- 避免僵尸线程
+  - pthread_join
+  - pthread_detach
+  - pthread_create指定分离属性
+- malloc和mmap申请的内存可以被其他线程释放
+- 应避免在多线程模型中调用fork除非，马上exec，子进程中只有调用fork的线程存在，其他线程在子进程中均pthread_exit
+- 信号的复杂语义很难和多线程共存，应避免在多线程引入信号机制
+- 线程ID和LWP(线程号)不一样，线程号是内核用来分配时间片的依据，而线程ID是进程在内部用来区分不同线程时使用！
+- 线程创建的时候不能使用指针传递，要使用值传递(立马拷贝)，值传递，在64位其实不影响！小类型变大类型再变回来不会有影响！
+- 当创建线程的时候如果创建线程的函数会用jion等待子线程的时候，可以用指针传参，这时候主线程函数的所有内容还存在，获取该地址的内容也不会出错。但是如果不需要等待子线程结束而直接向下运行的时候，传参就有可能出现问题，就是创建线程的函数执行完成后，其所占的空间会被释放而值被改变，而创建的线程此时会根据参数地址去取其值，但是此空间已经被改变，所以再取内容会出错。
+- pthread_self函数没有失败的情况！
+- pthread_detach线程分离，进程没有与之对应的函数，不是execl的对应，线程里执行exec函数会造成整个进程(多个线程)损坏(待验证)，所以线程中多用system函数(先建子进程，再执行命令)；
+- 对分离的线程回收函数返回值错误码22，表示不能对分离的线程回收；
+- 对一个已经回收了的线程再回收，函数返回值是3；
+- 调用pthread_cancel杀死一个线程，对该线程回收时，函数返回值是"-1"；
+- pthread_cancel函数不是实时的，有延时，需要线程被取消的线程到达某个取消点，如果只有一个while(1)循环，里面没有任何操作，线程是无法杀死的，pthread_testcancel手动添加取消点；
+## 2.9. 线程同步
+### 2.9.1. 概念
+- 线程同步，指一个线程发出某一功能调用时，在没有得到结果之前，该调用不返回。同时其它线程为保证数据一致性，不能调用该功能。
+- "同步"是为了避免数据混乱，解决与时间有关的错误，不仅线程间需要同步，进程间、信号间等都需要同步机制(多个控制流共同操作一个共享资源的情况都需要同步);
+### 2.9.2. 同步原因
+- 资源共享（独享资源则不会）
+- 调度随机（意味着数据访问会出现竞争）
+- 线程间缺乏必要的同步机制
+- 以上三点中，前两点不能改变，只能从第三点着手解决，使多个线程在访问共享资源的时候，出现互斥；
+### 2.9.3. 互斥量
+- mutex：互斥量、互斥锁
+- 每个线程在对资源操作前都尝试先加锁，成功加锁才能操作，操作结束解锁
+- 当A线程对某个全局变量加锁访问，B在访问前尝试加锁，拿不到锁，B阻塞。C线程不去加锁，而直接访问该全局变量，依然能够访问，但会出现数据混乱，互斥锁实质上是操作系统提供的一把“建议锁”（又称“协同锁”），建议程序中有多线程访问共享资源的时候使用该机制。但，并没有强制限定，即使有了mutex，如果有线程不按规则来访问数据，依然会造成数据混乱
+- 函数：
+  - pthread_mutex_init函数，初值1
+	- pthread_mutex_destroy函数
+	- pthread_mutex_lock函数
+	- pthread_mutex_trylock函数
+	- pthread_mutex_unlock函数
+	- 成功返回0，失败直接返回错误号！
+	- pthread_mutex_t 类型，其本质是一个结构体。为简化理解，应用时可忽略其实现细节，简单当成整数看待
+	- pthread_mutex_t mutex; 变量mutex只有两种取值1、0
+	- restrict关键字：只用于限制指针，告诉编译器，所有修改该指针指向内存中内容的操作，只能通过本指针完成。不能通过除本指针以外的其他变量或指针修改
+- 如果互斥锁 mutex 是静态分配的（定义在全局，或加了static关键字修饰），可以直接使用宏进行初始化。e.g.  pthead_mutex_t muetx = PTHREAD_MUTEX_INITIALIZER；2.	动态初始化：局部变量应采用动态初始化。e.g.  pthread_mutex_init(&mutex, NULL)
+- lock尝试加锁，如果加锁不成功，线程阻塞，阻塞到持有该互斥量的其他线程解锁为止。
+- unlock主动解锁函数，同时将阻塞在该锁上的所有线程全部**唤醒**，至于哪个线程先被唤醒，取决于优先级、调度。默认：先阻塞、先唤醒。
+- trylock加锁失败直接返回错误号（如：EBUSY），不阻塞
+- 在访问共享资源前加锁，访问结束后立即解锁。锁的“粒度”应越小越好
+- 死锁
+  - 线程试图对同一个互斥量A加锁两次
+  - 线程1拥有A锁，请求获得B锁；线程2拥有B锁，请求获得A锁
+- 避免死锁的方法：
+  - 当得不到所有所需资源时，放弃已经获得的资源，等待。
+  - 保证资源的获取顺序，要求每个线程获取资源的顺序一致。如：A获取顺序1、2、3；B顺序应也是1、2、3。若B为3、2、1则易出现死锁现象
+### 2.9.4. 读写锁
+- 与互斥量类似，但读写锁允许更高的并行性。其特性为：写独占，读共享
+- 一把读写锁具备三种状态
+  - 读模式下加锁状态 (读锁)
+  - 写模式下加锁状态 (写锁)
+  - 不加锁状态
+- 特性
+  - 读写锁是“写模式加锁”时， 解锁前，所有对该锁加锁的线程都会被阻塞
+  - 读写锁是“读模式加锁”时， 如果线程以读模式对其加锁会成功；如果线程以写模式加锁会阻塞
+  - 读写锁是“读模式加锁”时， 既有试图以写模式加锁的线程，也有试图以读模式加锁的线程。那么读写锁会阻塞随后的读模式锁请求。优先满足写模式锁。读锁、写锁并行阻塞，写锁优先级高
+  - 读写锁非常适合于对数据结构读的次数远大于写的情况
+- 函数
+  - pthread_rwlock_init函数
+	- pthread_rwlock_destroy函数
+	- pthread_rwlock_rdlock函数  
+	- pthread_rwlock_wrlock函数
+	- pthread_rwlock_tryrdlock函数
+	- pthread_rwlock_trywrlock函数
+	- pthread_rwlock_unlock函数
+  - 成功返回0，失败直接返回错误号！
+  - pthread_rwlock_t类型	用于定义一个读写锁变量
+### 2.9.5. 条件变量
+- 条件变量本身不是锁！但它也可以造成线程阻塞。通常与互斥锁配合使用。给多线程提供一个会合的场所
+- 函数
+  - pthread_cond_init函数
+	- pthread_cond_destroy函数
+	- pthread_cond_wait函数
+	- pthread_cond_timedwait函数
+	- pthread_cond_signal函数
+	- pthread_cond_broadcast函数
+	- 成功返回0，失败直接返回错误号！
+	- pthread_cond_t类型	用于定义条件变量
+	- 可以使用静态初始化的方法，初始化条件变量：pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+- pthread_cond_wait函数，阻塞等待一个条件变量
+  - 阻塞等待条件变量cond满足，释放已掌握的互斥锁(这两部是原子操作)；
+  - 当被唤醒，pthread_cond_wait函数返回时，解除阻塞并重新申请获取互斥锁(但会出现没有抢上资源的问题，建议while判断)；
+- pthread_cond_timedwait函数，限时等待一个条件变量
+  - 参数三看man sem_timedwait函数，查看struct timespec结构体
+  - 形参abstime：绝对时间(time(NULL)返回的就是绝对时间。而alarm(1)是相对时间，相对当前时间定时1秒)
+    - time_t cur = time(NULL); 获取当前时间。
+    - struct timespec t;	定义timespec 结构体变量t
+		- t.tv_sec = cur+1; 定时1秒
+- 相较于mutex而言，条件变量可以减少竞争
+- 如直接使用mutex，除了生产者、消费者之间要竞争互斥量以外，消费者之间也需要竞争互斥量，但如果汇聚（链表）中没有数据，消费者之间竞争互斥锁是无意义的。有了条件变量机制以后，只有生产者完成生产，才会引起消费者之间的竞争。提高了程序效率
+### 2.9.6. 信号量
+- 由于互斥锁的粒度比较大，如果我们希望在多个线程间对某一对象的部分数据进行共享，使用互斥锁是没有办法实现的，只能将整个数据对象锁住。这样虽然达到了多线程操作共享数据时保证数据正确性的目的，却无形中导致线程的并发性下降。线程从并行执行，变成了串行执行。与直接使用单进程无异
+- 信号量，是相对折中的一种处理方式，既能保证同步，数据不混乱，又能提高线程并发
+- 函数
+  - sem_init函数，参数pshared取0用于线程间；取非0（一般为1）用于进程间
+	- sem_destroy函数
+	- sem_wait函数
+	- sem_trywait函数	
+	- sem_timedwait函数	
+	- sem_post函数
+  - 成功返回0，失败返回-1同时设置errno；
+  - sem_t类型，本质仍是结构体。但应用期间可简单看作为整数，忽略实现细节
+- 由于sem_t的实现对用户隐藏，所以所谓的++、--操作只能通过函数来实现，而不能直接++、--符号；
+- 信号量的初值，决定了占用信号量的线程的个数？
+### 2.9.7. 进程间同步
+#### 2.9.7.1. 互斥量
+- 进程间也可以使用互斥锁，来达到同步的目的。但应在pthread_mutex_init初始化之前，修改其属性为进程间共享
+- pthread_mutexattr_t mattr类型：用于定义mutex锁的**属性**
+- pthread_mutexattr_init函数：初始化一个mutex属性对象
+- pthread_mutexattr_destroy函数：销毁mutex属性对象 (而非销毁锁)
+- pthread_mutexattr_setpshared函数：修改mutex属性
+  - 线程锁：PTHREAD_PROCESS_PRIVATE (mutex的默认属性即为线程锁，进程间私有)
+  - 进程锁：PTHREAD_PROCESS_SHARED
+#### 2.9.7.2. 文件锁
+- 借助 fcntl函数来实现锁机制。	操作文件的进程没有获得锁时，可以打开，但无法执行read、write操作
+- "int fcntl(int fd, int cmd, ... /* arg */ )"
+- 参数二cmd：
+  - F_SETLK (struct flock *)	设置文件锁（trylock）
+  - F_SETLKW (struct flock *) 设置文件锁（lock）W --> wait
+  - F_GETLK (struct flock *)	获取文件锁
+- 参数三
+   struct flock {
+              ...
+              short l_type;    	锁的类型：F_RDLCK 、F_WRLCK 、F_UNLCK
+              short l_whence;  	偏移位置：SEEK_SET、SEEK_CUR、SEEK_END 
+              off_t l_start;   		起始偏移：1000
+              off_t l_len;     		长度：0表示整个文件加锁
+              pid_t l_pid;     	持有该锁的进程ID：(F_GETLK only)
+              ...
+         };
+- 依然遵循“读共享、写独占”特性。但！如若进程不加锁直接操作文件，依然可访问成功，但数据势必会出现混乱
+## 2.10. 提示
+- 使用互斥量来加锁解锁时，粒度(共享资源处加锁，不要多加)越小越好！
+- 条件变量：在需要获取的资源没有的情况才调用wait！另外，就算被唤醒了，但可能由于等待的线程较多而不一定能抢上资源，所以应该用while而不是if判断资源的是否没有！
+- 可以利用一个互斥量(互斥锁)和一个条件变量实现生产者消费者模型！
+- 可以利用两个信号量和一个队列实现生产者消费者模型！
+- IPC:管道(有名和无名)、信号，共享映射区、本地套接字等；
+- 线程同步：互斥量(互斥锁pthread_mutex)、读写锁(pthread_rwlock)、条件变量(pthread_cond)、信号量(sem)
+- 进程同步：信号量(sem)、互斥量(pthread_mutex，需要借助mmap实现在进程间访问)、文件锁
+## 2.11.疑问：
+- return和exit和pthread_exit的区别，在没有线  程的代码中和有线程的代码中的使用注意事项？
 
-线程ID和LWP(线程号)不一样，线程号是内核用来分配时间片的依据，而线程ID是进程在内部用来区分不同线程时使用！
+- 线程下给用于返回的局部变量(结构体变量)malloc回来的空间在哪回收？  
+  (方法一，creat的时候将malloc好的空间传进去，线程内取空间做返回使用；方法二，join线程定义一级指针，取地址变二级指针传进线程，线程malloc出一级指针，然后返回一级指针即可)
 
-线程创建的时候不能使用指针传递，要使用值传递(立马拷贝)，值传递，在64位其实不影响！小类型变大类型再变回来不会有影响！
-当创建线程的时候如果创建线程的函数会用jion等待子线程的时候，可以用指针传参，这时候主线程函数的所有内容还存在，获取该地址的内容也不会出错。但是如果不需要等待子线程结束而直接向下运行的时候，传参就有可能出现问题，就是创建线程的函数执行完成后，其所占的空间会被释放而值被改变，而创建的线程此时会根据参数地址去取其值，但是此空间已经被改变，所以再取内容会出错。
+- 线程回收有没有不阻塞的方法，要不然太浪费？
 
-return和exit和pthread_exit的区别，在没有线  程的代码中和有线程的代码中的使用注意事项？
+- 使用读写锁的时候应该也会有死锁的问题出现把？
 
-pthread_self函数没有失败的情况！
+- 信号量初始化的时候为零，可不可以通过post多次++sem，怎么限制一个信号量可以被几个线程使用？
 
-线程共享全局变量；
-
-线程下给用于返回的局部变量(结构体变量)malloc回来的空间在哪回收？(方法一，creat的时候将malloc好的空间传进去，线程内取空间做返回使用；方法二，join线程定义一级指针，取地址变二级指针传进线程，线程malloc出一级指针，然后返回一级指针即可)
-
-线程回收有没有不阻塞的方法，要不然太浪费！
-
-pthread_detach线程分离，进程没有与之对应的函数，不是execl的对应，线程里执行exec函数会造成整个进程(多个线程)损坏(待验证)，所以线程中多用system函数(先建子进程，再执行命令)；
-对分离的线程回收函数返回值错误码22，表示不能对分离的线程回收；
-
-线程分离的好处是不用回收线程，PCB主动释放；
-
-对一个已经回收了的线程再回收，函数返回值是3；
-
-
-调用pthread_cancel杀死一个线程，对该线程回收时，函数返回值是"-1"；
-pthread_cancel函数不是实时的，有延时，需要线程被取消的线程到达某个取消点，如果只有一个while(1)循环，里面没有任何操作，线程是无法杀死的，那有哪些情况是取消点？
-
-pthread_testcancel手动添加取消点；
-
-
-
-
-
-
-
-
-
-
->删除从windows拷贝文件到ubuntu中多了的"^M"：
-使用vi编辑末行模式替换：
-:%s/^M/\r/g
-用来把^M换成回车，注意的是^M要使用CTRL-V CTRL-M生成，而不是直接键入^M
-
-
-pos = str.find("\t")，pos必须定义为 string::size_type，
-最好的办法是直接比较：if (str.find("\t") == string::npos) { … } 
- c++中 npos 是这样定义的：static const size_type npos = -1;
- string::size_type 由字符串配置器 allocator 定义
- (unsigned long)-1 和 (unsigned short)-1 不同，类似原因有时都是-1却返回false；
-
-
-cat /proc/mounts得到当前系统挂载的文件系统：
- /dev/mmcblk1p1 /sdcard vfat rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro 0 0
-后面的选项是什么意思？不同平台/proc/mounts的输出格式都是这样的吗？
-
-
-struct timeval time_start, time_end;
-gettimeofday(&time_start, nullptr);
-  AM_SYSTEM(cmd);
-gettimeofday(&time_end, nullptr);
-
-
-#include<unistd.h>
-void sync(void);
-int fsync(int filedes);
-int fdatasync(int filedes);
-返回值：若成功则返回0,出错则返回 -1
-sync 函数只是将所有修改过的块缓冲区排入写队列，然后就返回，它并不等待实际写磁盘操作结束。
-通常称为 update的系统守护进程会周期性的（一般每隔30秒）调用sync函数。保证了定期冲洗内核的块缓冲区。命令 sync也调用sync函数。
-fsync函数只对由文件描述符 filedes 指定的单一文件起作用，并且等待写磁盘操作结束，然后返回。
-fdatasync函数类似于 fsync，但它只影响文件的数据部分。
-"echo 3 > /proc/sys/vm/drop_caches":手动清除缓存cache
-Buffers:被OS buffer（written to disk）住的内存.buffer用于存放要输出到disk(块设备)的数据
-Cache：存放从disk上读出的数据。 Buffer和cache是为了提高IO性能并由OS管理
--buffer/cache：一个应用程序认为系统被用掉多少内存；=used-buffers-cached
-+buffer/cache：一个应用程序认为系统还有多少内存； = ? + buffers+cached
-Free命令读取的数据都是从：cat /proc/meminfo中读取的
-
-
-查看进程内存使用情况：
-ps aux
-top
-free
-pmap
-cat /proc/pid/smaps
-cat /proc/pid/maps
-cat /proc/pid/statm
-
-
-SOC的地址空间只有4G，那它是怎么管理8G的eMMC的？
-SOC的启动过程到底是什么样的？
-
-
-使用dd指令，对磁盘进行连续写入，不使用内存缓冲区，每次写入8k的数据，总共写入20万次，产生1.6G大小的文件。
-dd if=/dev/zero of=/data01/test.dbf bs=8k count=200000 conv=fdatasync
+- 哲学家吃饭问题？
 
 ## 疑问
 1. 嵌入式开发中，MMU的映射表谁来设置填写？
@@ -1853,16 +2050,81 @@ dd if=/dev/zero of=/data01/test.dbf bs=8k count=200000 conv=fdatasync
 16. 时序竞态、全局变量的异步IO和可重入不可重入函数的使用技巧和如何避免？
 17. POSIX.1和BSD和System V的区别？
 
-
- 
-
 ## 备注
 - /dev/zero和/dev/null一个读一个写，大小无限；
 - I/O操作是最能拖慢执行效率的操作，优化程序时可以最先从这里下手；
 - 所有的系统调用都是原子操作！- 
 - 可以用malloc申请0字节大小的空间，且可以释放！
 
+## 模块
+---
 
+总结以下时间
+time()函数
+timespace结构体
+timeval结构体；
+time_t 类型 
+绝对时间(pthread_cond_timedwait,sem_timedwait)，相对时间(setitimer())
+sleep
+struct timeval time_start, time_end;
+gettimeofday(&time_start, nullptr);
+  AM_SYSTEM(cmd);
+gettimeofday(&time_end, nullptr);
+
+---
+
+pos = str.find("\t")，pos必须定义为 string::size_type，
+最好的办法是直接比较：if (str.find("\t") == string::npos) { … } 
+ c++中 npos 是这样定义的：static const size_type npos = -1;
+ string::size_type 由字符串配置器 allocator 定义
+ (unsigned long)-1 和 (unsigned short)-1 不同，类似原因有时都是-1却返回false；
+
+---
+
+cat /proc/mounts得到当前系统挂载的文件系统：
+ /dev/mmcblk1p1 /sdcard vfat rw,relatime,fmask=0022,dmask=0022,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro 0 0
+后面的选项是什么意思？不同平台/proc/mounts的输出格式都是这样的吗？
+
+---
+
+#include<unistd.h>
+void sync(void);
+int fsync(int filedes);
+int fdatasync(int filedes);
+返回值：若成功则返回0,出错则返回 -1
+sync 函数只是将所有修改过的块缓冲区排入写队列，然后就返回，它并不等待实际写磁盘操作结束。
+通常称为 update的系统守护进程会周期性的（一般每隔30秒）调用sync函数。保证了定期冲洗内核的块缓冲区。命令 sync也调用sync函数。
+fsync函数只对由文件描述符 filedes 指定的单一文件起作用，并且等待写磁盘操作结束，然后返回。
+fdatasync函数类似于 fsync，但它只影响文件的数据部分。
+"echo 3 > /proc/sys/vm/drop_caches":手动清除缓存cache
+Buffers:被OS buffer（written to disk）住的内存.buffer用于存放要输出到disk(块设备)的数据
+Cache：存放从disk上读出的数据。 Buffer和cache是为了提高IO性能并由OS管理
+-buffer/cache：一个应用程序认为系统被用掉多少内存；=used-buffers-cached
++buffer/cache：一个应用程序认为系统还有多少内存； = ? + buffers+cached
+
+---
+
+Free命令读取的数据都是从：cat /proc/meminfo中读取的
+查看进程内存使用情况：
+ps aux
+top
+free
+pmap
+cat /proc/pid/smaps
+cat /proc/pid/maps
+cat /proc/pid/statm
+
+---
+
+SOC的地址空间只有4G，那它是怎么管理8G的eMMC的？
+SOC的启动过程到底是什么样的？
+
+---
+
+使用dd指令，对磁盘进行连续写入，不使用内存缓冲区，每次写入8k的数据，总共写入20万次，产生1.6G大小的文件。
+dd if=/dev/zero of=/data01/test.dbf bs=8k count=200000 conv=fdatasync
+
+---
 
 金步国：http://www.jinbuguo.com/
 https://www.iteye.com/blog/elf8848-2088986
@@ -1874,7 +2136,5 @@ https://www.iteye.com/blog/elf8848-2088986
 阅读一篇视频编解码文档；
 阅读shell脚本编程；
 阅读lua编程；
-
-
 
 <div style="font-size: 9px; margin-left: 1cm;"> <span class='pageNumber'></span> / <span class='totalPages'></span></div><div style="font-size: 9px; margin-left: auto; margin-right: 1cm; "> <span class=“say”>BurgessKzg</span></div>
