@@ -2138,3 +2138,8 @@ https://www.iteye.com/blog/elf8848-2088986
 阅读lua编程；
 
 <div style="font-size: 9px; margin-left: 1cm;"> <span class='pageNumber'></span> / <span class='totalPages'></span></div><div style="font-size: 9px; margin-left: auto; margin-right: 1cm; "> <span class=“say”>BurgessKzg</span></div>
+
+
+VT100终端
+
+添加线程函数"pthread_setname_np"相关笔记
