@@ -93,7 +93,16 @@
 ## 3.2. TCP/IP四层模型
 
 
-markdown滚动条：https://blog.csdn.net/weixin_34026276/article/details/93664191
+
+对于select函数,一个描述符上有多个事件来的时候,返回几(对于监听连接的socket，当同时有多个客户端要连接时，返回几)?
+
+定义一个元素个数为1000的**结构体数组**,不初始化的话不占用空间吗?
+
+TCP中的标志RST是谁发出？发给客户端还是服务器端？谁复位?  
+
+cplusplus.chm：http://pt.findeen.com/cplusplus_reference_chm.html
+
+结构体数组不初始化的时候不占用空间?
 
 
 
@@ -101,175 +110,4 @@ markdown滚动条：https://blog.csdn.net/weixin_34026276/article/details/936641
 nc命令client，server有对应命令吗？
 toupper
 tolower
-
-<style type="text/css"> 
-.scroll 
-{  
-    width: 600px;/*宽度*/  
-    height: 600px;/*高度*/  
-    color: ;/*颜色*/  
-    font-family:黑体;/*字体*/  
-    padding-left: 10px;/*层内左边距*/  
-    padding-right: 10px;/*层内右边距*/  
-    padding-top: 10px;/*层内上边距*/  
-    padding-bottom: 10px;/*层内下边距*/  
-    overflow-x: scroll;/*横向滚动条(scroll:始终出现;auto:必要时出现;*/  
-    overflow-y: scroll;/*竖向滚动条*/  
-}  
-</style>
-
-<html>
-<body>  
-<div class="scroll"> 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <sys/un.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <linux/types.h>
-#include <linux/netlink.h>
-#include <errno.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-
-#define UEVENT_BUFFER_SIZE 2048
-
-static int init_hotplug_sock()
-{
-const int buffersize = 1024;
-int ret;
-
-struct sockaddr_nl snl;
-bzero(&snl, sizeof(struct sockaddr_nl));
-snl.nl_family = AF_NETLINK;
-snl.nl_pid = getpid();
-snl.nl_groups = 1;
-
-int s = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT);
-if (s == -1)
-{
-perror("socket");
-return -1;
-}
-setsockopt(s, SOL_SOCKET, SO_RCVBUF, &buffersize, sizeof(buffersize));
-
-ret = bind(s, (struct sockaddr *)&snl, sizeof(struct sockaddr_nl));
-if (ret < 0)
-{
-perror("bind");
-close(s);
-return -1;
-}
-
-return s;
-}
-
-int main(int argc, char* argv[])
-{
-int hotplug_sock = init_hotplug_sock();
-
-while(1)
-{
-/* Netlink message buffer */
-char buf[UEVENT_BUFFER_SIZE * 2] = {0};
-recv(hotplug_sock, &buf, sizeof(buf), 0);
-printf("%s\n", buf);
-
-/* USB 设备的插拔会出现字符信息，通过比较不同的信息确定特定设备的插拔，在这添加比较代码 */
-
-}
-return 0;
-}
-</div> 
-</body> 
-</html>
-
-
-
-
-
-
-
-
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <sys/un.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <linux/types.h>
-#include <linux/netlink.h>
-#include <errno.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-
-#define UEVENT_BUFFER_SIZE 2048
-
-static int init_hotplug_sock()
-{
-const int buffersize = 1024;
-int ret;
-
-struct sockaddr_nl snl;
-bzero(&snl, sizeof(struct sockaddr_nl));
-snl.nl_family = AF_NETLINK;
-snl.nl_pid = getpid();
-snl.nl_groups = 1;
-
-int s = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT);
-if (s == -1)
-{
-perror("socket");
-return -1;
-}
-setsockopt(s, SOL_SOCKET, SO_RCVBUF, &buffersize, sizeof(buffersize));
-
-ret = bind(s, (struct sockaddr *)&snl, sizeof(struct sockaddr_nl));
-if (ret < 0)
-{
-perror("bind");
-close(s);
-return -1;
-}
-
-return s;
-}
-
-int main(int argc, char* argv[])
-{
-int hotplug_sock = init_hotplug_sock();
-
-while(1)
-{
-/* Netlink message buffer */
-char buf[UEVENT_BUFFER_SIZE * 2] = {0};
-recv(hotplug_sock, &buf, sizeof(buf), 0);
-printf("%s\n", buf);
-
-/* USB 设备的插拔会出现字符信息，通过比较不同的信息确定特定设备的插拔，在这添加比较代码 */
-
-}
-return 0;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
