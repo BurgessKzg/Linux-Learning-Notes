@@ -83,7 +83,7 @@
         int tm_isdst;  /* Daylight saving time */
     };
 ```
-- tm_sec：0-59范围内的真实秒值<font color=red>注释中的60？</font>；
+- tm_sec：0-60范围内的真实秒值，<font color=red>60？</font>；
 - tm_min：0-59范围内的真实分钟值；
 - tm_hour：0-23范围内的真实小时值；
 - tm_mday：1-31范围内的真实日期日值；
@@ -91,7 +91,7 @@
 - tm_year：从1900年开始的年值<font color=red>是1900，不是1970</font>；
 - tm_wday：0-6范围内的星期值，0代表周日；
 - tm_yday：0-365范围内的一年中的第几天，0代表1月1日；
-- tm_isdst：夏令时间<font color=red>怎么理解？</font>
+- tm_isdst：夏令时间
 
 ## 3.4. timeval
 
@@ -511,13 +511,13 @@
 # 6. 疑问
 
 - linuxOS能应用的最小时间精度，应用层可以保证的时间精度？
-- 验证：printf("%" PRId64"\n",m_tyTimeVal);
-- 夏令时是什么意思？
-- POSIX是什么？
-- 时区，夏令时，等概念
+- 验证：printf("%" PRId64"\n",m_tyTimeVal)？
+- 格林威治&夏令时&时区？
+- POSIX？
 - 线程安全？
-- 哪些结构体在将来某个时间点就不能使用了？
-- ctime族中多个函数返回结构体指针，是不是需要手动释放？函数内部是怎么返回一个结构体？
+- 哪些结构体在将来某个时间点就不能使用了(time_t?)？
+- ctime族多个函数返回结构体指针，返回的是那个区域(常量?堆区?栈？)？谁释放？
+- tm结构体tm_sec成员的值60什么情况下应用？
 
 
 
